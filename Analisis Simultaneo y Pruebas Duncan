@@ -1,0 +1,225 @@
+
+# ============================================================
+# ANALISIS SIMULTANEO DE DOS CUADROS LATINOS 4x4
+# LOCALIDADES: CLEMSON Y TIFTON
+# CULTIVO: PEPINO
+# ============================================================
+
+# 1. CREAR LOS DATOS DE CLEMSON
+
+clemson <- data.frame(
+  loc = "Clemson",
+  row = rep(1:4, each = 4),
+  col = rep(1:4, times = 4),
+  
+  gen = c(
+    "Poinsett", "Sprint", "Dasher", "Guardian",
+    "Sprint", "Guardian", "Poinsett", "Dasher",
+    "Guardian", "Dasher", "Sprint", "Poinsett",
+    "Dasher", "Poinsett", "Guardian", "Sprint"
+  ),
+  
+  yield = c(
+    11.5, 15.1, 44.2, 33.0,
+    20.3, 13.6, 22.4, 54.1,
+    44.1, 47.2, 41.3, 30.3,
+    36.7, 21.5, 35.8, 27.1
+  )
+)
+
+# 2. CREAR LOS DATOS DE TIFTON
+
+tifton <- data.frame(
+  loc = "Tifton",
+  row = rep(1:4, each = 4),
+  col = rep(1:4, times = 4),
+  
+  gen = c(
+    "Poinsett", "Sprint", "Dasher", "Guardian",
+    "Sprint", "Guardian", "Poinsett", "Dasher",
+    "Guardian", "Dasher", "Sprint", "Poinsett",
+    "Dasher", "Poinsett", "Guardian", "Sprint"
+  ),
+  
+  yield = c(
+    53.5463, 34.7026, 36.5749, 35.0771,
+    37.5220, 29.1300, 24.6696, 43.3040,
+    49.3943, 40.2423, 30.7489, 38.4251,
+    61.4758, 50.7930, 40.0661, 39.9119
+  )
+)
+
+# 3. UNIR AMBAS LOCALIDADES
+
+datos <- rbind(clemson, tifton)
+
+# 4. DEFINIR LOS FACTORES
+
+datos$loc <- factor(datos$loc)
+datos$row <- factor(datos$row)
+datos$col <- factor(datos$col)
+
+datos$gen <- factor(
+  datos$gen,
+  levels = c("Dasher", "Guardian", "Poinsett", "Sprint")
+)
+
+# 5. VISUALIZAR LA BASE DE DATOS
+
+print(datos)
+str(datos)
+
+# Verificar cantidad de observaciones por localidad
+table(datos$loc)
+
+# Verificar la distribucion de los genotipos
+with(datos, table(loc, gen))
+
+# 6. MODELO ANOVA SIMULTANEO
+# Filas y columnas anidadas dentro de localidad
+
+modelo_simultaneo <- aov(
+  yield ~ loc + loc:row + loc:col + gen + loc:gen,
+  data = datos
+)
+
+# 7. TABLA DE ANALISIS DE VARIANZA
+
+anova(modelo_simultaneo)
+
+# 8. RESUMEN DEL MODELO
+
+summary(modelo_simultaneo)
+
+# 9. MEDIAS DE RENDIMIENTO POR GENOTIPO
+
+aggregate(yield ~ gen, data = datos, mean)
+
+# 10. MEDIAS DE RENDIMIENTO POR LOCALIDAD
+
+aggregate(yield ~ loc, data = datos, mean)
+
+# 11. MEDIAS DE GENOTIPO POR LOCALIDAD
+
+aggregate(yield ~ loc + gen, data = datos, mean)
+
+# 12. DIAGNOSTICO DE NORMALIDAD DE LOS RESIDUOS
+
+residuos <- residuals(modelo_simultaneo)
+
+shapiro.test(residuos)
+
+# 13. GRAFICO DE INTERACCION LOCALIDAD-GENOTIPO
+
+interaction.plot(
+  x.factor = datos$gen,
+  trace.factor = datos$loc,
+  response = datos$yield,
+  fun = mean,
+  type = "b",
+  pch = 19,
+  xlab = "Genotipo",
+  ylab = "Rendimiento promedio",
+  trace.label = "Localidad",
+  main = "Interaccion Localidad x Genotipo"
+)
+
+
+
+# ============================================================
+# 14. PRUEBA DE DUNCAN PARA LOS GENOTIPOS
+# ============================================================
+
+# Instalar el paquete solamente si no está instalado
+if (!requireNamespace("agricolae", quietly = TRUE)) {
+  install.packages("agricolae")
+}
+
+library(agricolae)
+
+# Nivel de significancia
+alpha <- 0.05
+
+# ------------------------------------------------------------
+# 14.1. DUNCAN PARA LOS GENOTIPOS EN EL MODELO SIMULTANEO
+# ------------------------------------------------------------
+
+duncan_gen <- duncan.test(
+  modelo_simultaneo,
+  "gen",
+  alpha = alpha,
+  group = TRUE,
+  console = TRUE
+)
+
+# Mostrar grupos de Duncan
+print(duncan_gen$groups)
+
+
+# ============================================================
+# 15. PRUEBA DE DUNCAN POR LOCALIDAD
+# ============================================================
+
+# ------------------------------------------------------------
+# 15.1. LOCALIDAD CLEMSON
+# ------------------------------------------------------------
+
+modelo_clemson <- aov(
+  yield ~ row + col + gen,
+  data = clemson
+)
+
+duncan_clemson <- duncan.test(
+  modelo_clemson,
+  "gen",
+  alpha = alpha,
+  group = TRUE,
+  console = TRUE
+)
+
+cat("\n====================================\n")
+cat("PRUEBA DE DUNCAN: CLEMSON\n")
+cat("====================================\n")
+
+print(duncan_clemson$groups)
+
+
+# ------------------------------------------------------------
+# 15.2. LOCALIDAD TIFTON
+# ------------------------------------------------------------
+
+modelo_tifton <- aov(
+  yield ~ row + col + gen,
+  data = tifton
+)
+
+duncan_tifton <- duncan.test(
+  modelo_tifton,
+  "gen",
+  alpha = alpha,
+  group = TRUE,
+  console = TRUE
+)
+
+cat("\n====================================\n")
+cat("PRUEBA DE DUNCAN: TIFTON\n")
+cat("====================================\n")
+
+print(duncan_tifton$groups)
+
+
+# ============================================================
+# 16. MEDIAS DE GENOTIPO POR LOCALIDAD
+# ============================================================
+
+medias_loc_gen <- aggregate(
+  yield ~ loc + gen,
+  data = datos,
+  FUN = mean
+)
+
+print(medias_loc_gen)
+
+
+summary(modelo_simultaneo)
+
